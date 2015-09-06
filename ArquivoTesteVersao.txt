@@ -1,0 +1,3 @@
+Arquivo teste de versão
+Teste com git gui
+nova linha
