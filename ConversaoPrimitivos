@@ -1,0 +1,9 @@
+public class ConversaoPrimitivos {
+	public static void main(String[] args) {
+		  float f =  234.56F;
+		  short s = (short)f;
+		  byte b = (byte) 128;
+		  System.out.println(b);
+	}
+}
+
