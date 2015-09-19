@@ -1,0 +1,23 @@
+public class WhileRotulado {
+
+	public static void main(String[] args) {
+		int x = 0;
+		
+		for (int y = 0; y<20; y++) {
+				
+			rotulo: while (x < 10) {
+				System.out.println("valor de x:" + x);
+				x++;
+				continue rotulo;
+				//or break rotulo;
+			}
+		System.out.println("valor de y:" + y);
+		break;
+		//or continue 
+		}
+	}
+
+}
+
+//break: Encerrar loop inteiro
+//continue: Encerra a iteração atual
