@@ -1,0 +1,25 @@
+public class Propagate {
+	public static void main(String[] args) {
+		String teste = "capturando exceção";
+		try {
+			teste = reverse(teste);
+			System.out.println(teste);
+		} catch (Exception e) {
+			System.out.println("Ocorreu erro");
+		} finally {
+			System.out.println("final");
+		}
+	}
+
+	static String reverse(String s) {
+		String reverseStr = "";
+		if (s.length() > 0) {
+			for (int i = s.length() - 1; i >= 0; --i) {
+				reverseStr += s.charAt(i);
+			}
+		}
+		
+		return reverseStr;
+	}
+}
+
