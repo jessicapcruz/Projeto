@@ -1,0 +1,244 @@
+﻿Imports System.IO
+Imports System.Xml
+Imports System.Security.Cryptography
+Imports System.Security.Cryptography.X509Certificates
+Imports System.Security.Cryptography.Xml
+Imports System.Text
+
+<ComClass(assinaturaDigitalXML.ClassId, assinaturaDigitalXML.InterfaceId, assinaturaDigitalXML.EventsId)>
+Public Class assinaturaDigitalXML
+
+    Private objCertificadoX509 As New X509Certificate2
+    Private strConteudoXMLAssinado As String
+    Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
+    Public publicKey As String
+#Region "COM GUIDs"
+    ' These  GUIDs provide the COM identity for this class 
+    ' and its COM interfaces. If you change them, existing 
+    ' clients will no longer be able to access the class.
+    Public Const ClassId As String = "89c00c5e-0201-493d-a667-32e4a5a9273e"
+    Public Const InterfaceId As String = "1bf21152-83e8-4c08-8408-706ce30146e0"
+    Public Const EventsId As String = "8177af36-9480-42cd-aa26-397a0195d38d"
+#End Region
+
+    ' A creatable COM class must have a Public Sub New() 
+    ' with no parameters, otherwise, the class will not be 
+    ' registered in the COM registry and cannot be created 
+    ' via CreateObject.
+    Public Sub New()
+        MyBase.New()
+    End Sub
+
+    Public Function selecionarCertificadoDigital() As Boolean
+        Try
+            'Representa o local onde os certificados X509 são armazenados
+            'Seleciona os certificados locais e do usuário atual
+            Dim getCertificadosX509 As New X509Store("MY", StoreLocation.CurrentUser)
+            getCertificadosX509.Open(OpenFlags.ReadOnly Or OpenFlags.OpenExistingOnly)
+
+            'Representa uma coleção de objetos X509Certificate2
+            Dim objColecaoCertificadosX509 As New X509Certificate2Collection
+
+            'Abre a caixa de diálogo com os certificados disponíveis
+            objColecaoCertificadosX509 = X509Certificate2UI.SelectFromCollection(getCertificadosX509.Certificates,
+                                                                                 "Certificado(s) Digital(is) disponível(is)",
+                                                                                 "Selecione o certificado digital para assinatura",
+                                                                                 X509SelectionFlag.SingleSelection)
+
+            'Verifica se existe algum certificado selecionado
+            If objColecaoCertificadosX509.Count = 1 Then
+                'Evidenciar o certificado digital selecionado
+                objCertificadoX509 = objColecaoCertificadosX509.Item(0)
+
+                objColecaoCertificadosX509 = Nothing
+                getCertificadosX509 = Nothing
+                Return True
+            Else
+                objColecaoCertificadosX509 = Nothing
+                getCertificadosX509 = Nothing
+                Return False
+            End If
+
+        Catch ex As Exception
+            Return False
+        End Try
+    End Function
+
+    Public Function assinarDocumentoXML(ByVal strConteudoXML As String,
+                                        ByVal strTagXmlAssinatura As String) As Boolean
+        Try
+            If Len(Trim(objCertificadoX509.GetSerialNumberString())) <= 0 Then
+                MsgBox("Certificado Digital inválido.")
+                Return False
+            End If
+
+            If Len(Trim(strConteudoXML)) <= 0 Then
+                MsgBox("Conteúdo XML inválido.")
+                Return False
+            End If
+
+            If Len(Trim(strTagXmlAssinatura)) <= 0 Then
+                MsgBox("Tag para assinatura inválida.")
+                Return False
+            End If
+
+            If assinar(strConteudoXML, strTagXmlAssinatura) Then
+                Return True
+            Else
+                MsgBox("Erro descohecido.")
+                Return False
+            End If
+
+        Catch ex As Exception
+            MsgBox("Certificado Digital inválido.")
+            Return False
+        End Try
+    End Function
+
+    Private Function assinar(ByVal strConteudoXML As String,
+                             ByVal strTagXmlAssinatura As String) As Boolean
+
+        Try
+            'Representa uma coleção de objetos X509Certificate2
+            Dim objColecaoCertificadosX509 As X509Certificate2Collection = Nothing
+
+            'Instância que representa um certificado X509
+            Dim objCertificadoX509Assinado As New X509Certificate2()
+
+            'Representa o local onde os certificados X509 são armazenados
+            'Seleciona os certificados locais e do usuário atual
+            Dim getCertificadosX509 As New X509Store("MY", StoreLocation.CurrentUser)
+
+            'Abrir em modo de leitura e apenas os certificados existentes
+            getCertificadosX509.Open(OpenFlags.ReadOnly Or OpenFlags.OpenExistingOnly)
+
+            'Procure por certificados usando o número serial como parâmetro, 
+            'o último parâmetro indica para a função retornar somente certificados válidos
+            objColecaoCertificadosX509 = getCertificadosX509.Certificates.Find(X509FindType.FindBySerialNumber,
+                                                                               objCertificadoX509.GetSerialNumberString,
+                                                                               True)
+
+            'Verifica se existe algum certificado selecionado
+            If objColecaoCertificadosX509.Count = 1 Then
+                'Pega o certificado e armazena na variável
+                objCertificadoX509Assinado = objColecaoCertificadosX509.Item(0)
+
+
+                'Iniciamos um novo documento XML
+                Dim docXML = New XmlDocument()
+                docXML.PreserveWhitespace = False
+
+                docXML.LoadXml(strConteudoXML)
+
+                'Retornar a quantidade de tags de assinatura, deve existir apenas uma.
+                If docXML.GetElementsByTagName(strTagXmlAssinatura).Count = 1 Then
+                    'Classe usada para assinar o documento XML
+                    Dim signedXml As New Xml.SignedXml(docXML)
+
+                    'Configura a chave de assinatura
+                    signedXml.SigningKey = objCertificadoX509Assinado.PrivateKey
+
+                    'Representa o elemento de referência da assinatura digital do XML
+                    Dim Referencia As New Xml.Reference
+
+                    'Representar a identificação do elemento de assinatura
+                    Referencia.Uri = ""
+
+                    'Essa classe remove os elementos de assinatura <Signature> antes de 
+                    'criar um digest do documento XML
+                    Dim env As New XmlDsigEnvelopedSignatureTransform
+
+                    'Adicionamos o elemento na referência
+                    Referencia.AddTransform(env)
+
+                    'Representa a canonização C14N XML
+                    Dim c14 As New XmlDsigC14NTransform
+
+                    'Adicionamos o elemento na referência
+                    Referencia.AddTransform(c14)
+
+                    'Adiciona as referências na assinatura
+                    signedXml.AddReference(Referencia)
+
+                    'A classe KeyInfo representa o elemento <KeyInfo> da assinatura digital
+                    Dim KeyInfo As New KeyInfo
+
+                    'Carrega o certificado usando o objetoKeyInfoX509Data e adiciona ao elemento <KeyInfo>
+                    KeyInfo.AddClause(New KeyInfoX509Data(objCertificadoX509Assinado))
+
+                    'Adiciona o objeto KeyInfo na assinatura
+                    signedXml.KeyInfo = KeyInfo
+                    signedXml.ComputeSignature()
+
+                    'Criar um novo elemento XML
+                    Dim xmlDigitalSignature As XmlElement
+
+                    'Pega a assinatura digital e adiciona ao elemento
+                    xmlDigitalSignature = signedXml.GetXml()
+
+                    'Gravar o elemento no final do documento XML
+                    docXML.DocumentElement.AppendChild(docXML.ImportNode(xmlDigitalSignature, True))
+                    strConteudoXMLAssinado = docXML.OuterXml
+
+                    KeyInfo = Nothing
+                    c14 = Nothing
+                    env = Nothing
+                    Referencia = Nothing
+                    signedXml = Nothing
+                    docXML = Nothing
+                    getCertificadosX509 = Nothing
+                    objCertificadoX509Assinado = Nothing
+                    objColecaoCertificadosX509 = Nothing
+                    Return True
+                Else
+                    MsgBox(docXML.GetElementsByTagName(strTagXmlAssinatura).Count)
+                    docXML = Nothing
+                    getCertificadosX509 = Nothing
+                    objCertificadoX509Assinado = Nothing
+                    objColecaoCertificadosX509 = Nothing
+                    Return False
+                End If
+            Else
+
+                getCertificadosX509 = Nothing
+                objCertificadoX509Assinado = Nothing
+                objColecaoCertificadosX509 = Nothing
+                Return False
+            End If
+
+        Catch ex As Exception
+            Return False
+        End Try
+    End Function
+
+    Public Function retornaConteudoXMLAssinado() As String
+        Return strConteudoXMLAssinado
+    End Function
+
+    Public Function getEncryptText(strText As String) As String
+        Dim privateKey As RSACryptoServiceProvider
+        Dim buffer As Byte()
+        Dim signature As Byte()
+
+        privateKey = objCertificadoX509.PrivateKey
+        buffer = Encoding.Default.GetBytes(strText)
+        signature = privateKey.SignData(buffer, New SHA1Managed())
+
+        Return Convert.ToBase64String(signature)
+    End Function
+    Public Function assinaDocumento(cert As X509Certificate2, caminho As String) As Boolean
+        Dim Store As New X509Store("MY", StoreLocation.CurrentUser)
+        Store.Open(OpenFlags.ReadOnly)
+        Dim sel As New X509Certificate2Collection
+
+        sel = X509Certificate2UI.SelectFromCollection(Store.Certificates, "Certificado(s) Digital(is) disponível(is)",
+                                                                                 "Selecione o certificado digital para assinatura",
+                                                                                 X509SelectionFlag.SingleSelection)
+        Dim cp As New Org.BouncyCastle.X509.X509CertificateParser()
+        'Org.BouncyCastle.X509.X509CertificateParser cp = New Org.BouncyCastle.X509.X509CertificateParser();
+        ' Dim chain As New Org.BouncyCastle.X509.X509Certificate[] New(cp.ReadCertificate(cert.RawData))
+
+    End Function
+
+
+End Class
