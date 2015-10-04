@@ -1,0 +1,197 @@
+
+import javax.ejb.Local;
+import javax.ejb.Stateless;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Join;
+import javax.persistence.criteria.Order;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import br.com.polibel.entidade.Cliente;
+import br.com.polibel.entidade.Cliente_;
+import br.com.polibel.entidade.Endereco;
+import br.com.polibel.entidade.Endereco_;
+
+@Local
+@Stateless
+public class ClienteDao implements ClienteDaoRemote{
+	
+	@PersistenceContext
+	private EntityManager entityManager;
+
+	@Override
+	public Cliente salvar(Cliente cliente){
+		if(cliente != null && cliente.getId() == null) {
+			this.entityManager.persist(cliente);
+		} else if(cliente != null) {
+			cliente = this.entityManager.merge(cliente);
+		}
+		
+		for(Endereco endereco : cliente.getEnderecos()) {
+			if(endereco != null && endereco.getId() == null){
+			endereco.setCliente(cliente);
+			endereco.setId(null);
+			this.entityManager.persist(endereco);
+		}else if(endereco != null){
+			endereco.setId(null);
+			endereco = this.entityManager.merge(endereco);
+		}
+		}
+		return cliente;
+	}
+
+	@Override
+	public Cliente getByPK(final Long id) {
+		return this.entityManager.find(Cliente.class, id);
+	}
+	
+	@Override
+	public void excluir(final Long id) {
+		this.entityManager.remove(this.getByPK(id));
+	}
+
+	@Override
+	public List<Cliente> pesquisarTodos() {
+		TypedQuery<Cliente> query;
+		
+		query = this.entityManager.createNamedQuery("Cliente.pesquisarTodos", Cliente.class);
+		return query.getResultList();
+	}
+	
+	@Override
+	public List<Cliente> pesquisar(final Cliente cliente) {
+		final CriteriaBuilder criteriaBuilder;
+		final CriteriaQuery<Cliente> criteriaQuery;
+		final Root<Cliente> from;
+		final TypedQuery<Cliente> query;
+		List<Predicate> where;
+		
+		criteriaBuilder = this.entityManager.getCriteriaBuilder();
+		criteriaQuery = criteriaBuilder.createQuery(Cliente.class);
+		from = criteriaQuery.from(Cliente.class);
+		
+		criteriaQuery.select(from);
+		
+		where = new ArrayList<Predicate>();
+		
+		if(cliente != null) {
+			if(cliente.getNome() != null && cliente.getNome().length() > 0) {
+				where.add(criteriaBuilder.like(from.<String>get("nome"), criteriaBuilder.parameter(String.class, "nomeCliente")));
+			}
+			if(cliente.getNomeFantasia() != null && cliente.getNomeFantasia().length() > 0) {
+				where.add(criteriaBuilder.like(from.<String>get("nomeFantasia"), criteriaBuilder.parameter(String.class, "nomeFantasiaCliente")));
+			}
+			if(cliente.getEmail() != null && cliente.getEmail().length()>0) {
+				where.add(criteriaBuilder.equal(from.<String>get("email"), criteriaBuilder.parameter(String.class, "emailCliente")));
+			}
+			
+			if(cliente.getCnpj() != null && cliente.getCnpj().length()>0) {
+				where.add(criteriaBuilder.equal(from.<String>get("cnpj"), criteriaBuilder.parameter(String.class, "cnpjCliente")));
+			}
+			if(cliente.getInscricaoestadual() != null && cliente.getInscricaoestadual().length()>0) {
+				where.add(criteriaBuilder.equal(from.<String>get("inscricaoestadual"), criteriaBuilder.parameter(String.class, "inscricaoestadualCliente")));
+			}
+
+		}
+		
+		if(where.size() == 1) {
+			criteriaQuery.where(where.get(0));
+		} else if (where.size() > 1) {
+			criteriaQuery.where(criteriaBuilder.and((Predicate[]) where.toArray(new Predicate[0])));
+		}
+		
+		criteriaQuery.orderBy(new Order[]{criteriaBuilder.desc(from.get("nome"))});
+		
+		query = this.entityManager.createQuery(criteriaQuery);
+		
+		if(cliente != null) {
+			if(cliente.getNome() != null  && cliente.getNome().length()> 0) {
+				query.setParameter("nomeCliente", cliente.getNome()+"%");
+			}
+			if(cliente.getNomeFantasia() != null && cliente.getNomeFantasia().length()> 0) {
+				query.setParameter("nomeFantasiaCliente", cliente.getNomeFantasia()+"%");
+			}
+			if(cliente.getEmail() != null && cliente.getEmail().length()>0) {
+				query.setParameter("emailCliente", cliente.getEmail());
+			}
+			
+			if(cliente.getCnpj() != null && cliente.getCnpj().length()>0) {
+				query.setParameter("cnpjCliente", cliente.getCnpj());
+			}
+			if(cliente.getInscricaoestadual() != null && cliente.getInscricaoestadual().length()>0) {
+				query.setParameter("inscricaoestadualCliente", cliente.getInscricaoestadual());			
+			}
+
+		}
+		return query.getResultList();
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<Cliente> listByNome(final String nome) {
+		Query query;
+		
+		try {
+			query = this.entityManager.createNamedQuery("Cliente.listByNome", Cliente.class);
+		query.setParameter("nomeAluno", nome+"%");
+			
+			return query.getResultList();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	public List<Endereco> carregaEndereco(final Cliente cliente){
+		final CriteriaBuilder criteriaBuilder;
+		final CriteriaQuery<Endereco> criteriaQuery;
+		final Root<Endereco> from;
+		final TypedQuery<Endereco> query;
+		final Join<Endereco, Cliente> joinCliente;
+		List<Predicate> where;
+		
+		criteriaBuilder = this.entityManager.getCriteriaBuilder();
+		criteriaQuery = criteriaBuilder.createQuery(Endereco.class);
+		from = criteriaQuery.from(Endereco.class);
+		
+		criteriaQuery.select(from);
+		
+		where = new ArrayList<Predicate>();
+		
+		if(cliente != null) {
+			if(cliente.getId() != null && cliente.getId() > 0) {
+				//where.add(criteriaBuilder.equal(from.<String>get("cliente"), criteriaBuilder.parameter(String.class, "cliente")));
+				joinCliente = from.join(Endereco_.cliente);
+				where.add(criteriaBuilder.equal(joinCliente.get(Cliente_.id), criteriaBuilder.parameter(Cliente_.id.getJavaType(), Cliente_.id.getName())));
+
+			}
+		}
+		
+		if(where.size() == 1) {
+			criteriaQuery.where(where.get(0));
+		} else if (where.size() > 1) {
+			criteriaQuery.where(criteriaBuilder.and((Predicate[]) where.toArray(new Predicate[0])));
+		}
+		
+		criteriaQuery.orderBy(new Order[]{criteriaBuilder.desc(from.get("cliente"))});
+		
+		query = this.entityManager.createQuery(criteriaQuery);
+		
+		if(cliente != null) {
+			if(cliente.getId()!= null  && cliente.getId()> 0) {
+				query.setParameter("cliente", cliente.getId());
+				
+			}
+		}
+		
+		return query.getResultList();
+	}
+}
+
