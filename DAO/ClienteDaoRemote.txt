@@ -1,0 +1,21 @@
+
+
+import java.util.List;
+
+import javax.ejb.Remote;
+
+import br.com.polibel.entidade.Cliente;
+import br.com.polibel.entidade.Endereco;
+
+
+@Remote
+public interface ClienteDaoRemote {
+	public void excluir(final Long id);
+	public Cliente salvar(final Cliente aluno);
+	public Cliente getByPK(final Long id);
+	public List<Cliente> pesquisarTodos();
+	public List<Cliente> pesquisar(final Cliente cliente);
+	public List<Cliente> listByNome(final String nome);
+	public List<Endereco> carregaEndereco(final Cliente cliente);
+}
+
