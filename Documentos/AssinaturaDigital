@@ -123,7 +123,7 @@ public class AssinaturaDigital {
 		if (args.length > 0) {
 			String parametros = args[0];
 			String[] parametro;
-			parametro = parametros.split("&");
+			parametro = parametros.split(",");
 			String source = parametro[0];
 			String destination = parametro[1];
 			String keystore_password = parametro[2];  
