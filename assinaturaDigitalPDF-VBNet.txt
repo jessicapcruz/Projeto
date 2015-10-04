@@ -1,0 +1,179 @@
+﻿Imports System.IO
+Imports System.Xml
+Imports System.Security.Cryptography
+Imports System.Security.Cryptography.X509Certificates
+Imports System.Security.Cryptography.Xml
+Imports System.Text
+Imports iTextSharp.text.pdf
+Imports iTextSharp.text.pdf.security
+Imports iTextSharp.text
+Imports System.Security.Permissions
+Imports Org.BouncyCastle.Security
+Imports Org.BouncyCastle.Pkcs
+Imports com.itextpdf.text.pdf.security
+'Imports Org.BouncyCastle.X509
+<ComClass(assinaturaDigitalPDF.ClassId, assinaturaDigitalPDF.InterfaceId, assinaturaDigitalPDF.EventsId)>
+Public Class assinaturaDigitalPDF
+
+#Region "COM GUIDs"
+    ' These  GUIDs provide the COM identity for this class 
+    ' and its COM interfaces. If you change them, existing 
+    ' clients will no longer be able to access the class.
+    Public Const ClassId As String = "114687b4-f1b1-4d6e-8584-1b904418dfba"
+    Public Const InterfaceId As String = "6aaed7e5-0a93-417f-9154-395631b56fa8"
+    Public Const EventsId As String = "afc96eae-c2eb-4795-b3bc-1260f894df09"
+#End Region
+
+    ' A creatable COM class must have a Public Sub New() 
+    ' with no parameters, otherwise, the class will not be 
+    ' registered in the COM registry and cannot be created 
+    ' via CreateObject.
+    Public Sub New()
+        MyBase.New()
+    End Sub
+    Public Sub assinar(ByVal sourceDocument As String,
+                            ByVal destinationPath As String)
+
+        Dim store As New X509Store("MY", StoreLocation.CurrentUser)
+        store.Open(OpenFlags.ReadOnly Or OpenFlags.OpenExistingOnly)
+
+        Dim collection As X509Certificate2Collection = CType(store.Certificates, X509Certificate2Collection)
+        Dim fcollection As X509Certificate2Collection = CType(collection.Find(X509FindType.FindByTimeValid, DateTime.Now, False), X509Certificate2Collection)
+        Dim scollection As X509Certificate2Collection = X509Certificate2UI.SelectFromCollection(fcollection, "Selecione do Certificado", "Selecione um certificado.", X509SelectionFlag.SingleSelection)
+     
+        For Each x509 As X509Certificate2 In scollection          
+            assina(sourceDocument, destinationPath)
+        Next x509
+
+        store.Close()
+    End Sub
+
+
+    Public Sub tamanhoDoArquivo(ByVal strPathArquivo As String, ByVal destinationPath As String)
+        Dim reader As New PdfReader(strPathArquivo)
+        Dim doc As New Document(PageSize.LETTER)
+        Document.Compress = True
+        Dim writer As PdfWriter = PdfWriter.GetInstance(doc, New FileStream(destinationPath, FileMode.Append))
+
+        writer.SetPdfVersion(PdfWriter.PDF_VERSION_1_5)
+        writer.CompressionLevel = PdfStream.BEST_COMPRESSION
+        doc.Open()
+        Dim cb As PdfContentByte = writer.DirectContent
+
+        Dim page As PdfImportedPage
+        For pageNumber As Long = 1 To reader.NumberOfPages
+            page = writer.GetImportedPage(reader, pageNumber)
+            cb.AddTemplate(page, PageSize.LETTER.Width / reader.GetPageSize(pageNumber).Width, 0, 0, PageSize.LETTER.Height / reader.GetPageSize(pageNumber).Height, 0, 0)
+            doc.NewPage()
+        Next pageNumber
+        doc.Close()
+    End Sub
+
+    Public Sub gerarPDF(ByVal texto As String, ByVal arquivo As String, ByVal strCaminho As String)
+
+        Dim hoje As DateTime = DateTime.Now
+        Dim arquivoPDF = arquivo & ".pdf"
+        Dim doc As Document = New Document(PageSize.A4, 0, 0, 0, 0)
+        PdfWriter.GetInstance(doc, New FileStream(strCaminho + "\" & arquivoPDF, FileMode.Create))
+        doc.Open()
+        doc.Add(New Paragraph(texto))
+        doc.Close()
+
+    End Sub
+
+
+    Public Sub assina(ByVal sourceDocument As String,
+                            ByVal destinationPath As String, ByVal destinationPathOri As String)
+        Dim myX509Store As New X509Store(StoreName.My, StoreLocation.CurrentUser)
+        myX509Store.Open(OpenFlags.[ReadOnly])
+        'Dim myCertificateCollection As X509Certificate2Collection = myX509Store.Certificates
+        Dim myCertificateChain As IList(Of Org.BouncyCastle.X509.X509Certificate) = New List(Of Org.BouncyCastle.X509.X509Certificate)()
+        Dim myCertificate As X509Certificate2 = Nothing
+        Dim myCertificateCollection As X509Certificate2Collection = X509Certificate2UI.SelectFromCollection(myX509Store.Certificates, "Certificaten", "Select een certificaat om te tekenen", X509SelectionFlag.SingleSelection)
+
+        'Settings
+        Dim source = sourceDocument
+        Dim result = destinationPath
+        Dim reason = "teste"
+        Dim Location = "teste"
+        Dim ocspClient As IOcspClient = New OcspClientBouncyCastle()
+        Dim tsaClient As ITSAClient = Nothing
+	Dim size As Rectangle = New Rectangle(1.0F, 1.0F)
+	Dim crlList As IList(Of ICrlClient) = New List(Of ICrlClient)()
+        If myCertificateCollection.Count > 0 Then
+            Dim certificatesEnumerator As X509Certificate2Enumerator = myCertificateCollection.GetEnumerator()
+            certificatesEnumerator.MoveNext()
+            myCertificate = certificatesEnumerator.Current
+            'myCertificate = selectedCertificates(0)
+
+            Dim myX509Chain As New X509Chain()
+            myX509Chain.Build(myCertificate)
+
+            For Each myChainElement As X509ChainElement In myX509Chain.ChainElements
+                myCertificateChain.Add(DotNetUtilities.FromX509Certificate(myChainElement.Certificate))
+            Next
+        End If
+        myX509Store.Close()
+
+
+        For intI As Integer = 0 To myCertificateChain.Count - 1
+            Dim cert As Org.BouncyCastle.X509.X509Certificate = myCertificateChain(intI)
+            Dim tsaUrl As String = CertificateUtil.GetTSAURL(cert)
+
+            If tsaUrl IsNot Nothing Then
+                tsaClient = New TSAClientBouncyCastle(tsaUrl)
+                Exit For
+            End If
+        Next
+
+        
+        crlList.Add(New CrlClientOnline(myCertificateChain))
+
+        Using myPdfReader As New PdfReader(source)
+            Using myFileStream As New FileStream(result, FileMode.Create, FileAccess.Write)
+                Using myPdfStamper As PdfStamper = PdfStamper.CreateSignature(myPdfReader, myFileStream, "0"c)
+
+                    Dim myPdfDocument As New Document(myPdfReader.GetPageSizeWithRotation(1))
+
+                    myPdfStamper.SetFullCompression()
+
+                    Dim myPdfSignatureAppearance As PdfSignatureAppearance = myPdfStamper.SignatureAppearance
+                    myPdfSignatureAppearance.CertificationLevel = PdfSignatureAppearance.CERTIFIED_NO_CHANGES_ALLOWED
+                    myPdfSignatureAppearance.Reason = reason
+                    myPdfSignatureAppearance.Location = Location
+
+                    'myPdfSignatureAppearance.SetVisibleSignature(New Rectangle(myPdfDocument.PageSize.Width - 120, 36, myPdfDocument.PageSize.Width - 36, 96), myPdfReader.NumberOfPages, "Digital Signature")
+                    'myPdfSignatureAppearance.SetVisibleSignature(New Rectangle(20.0F, 1.0F, myPdfDocument.PageSize.Width - 20.0F, 30.0F), myPdfReader.NumberOfPages, "Digital Signature")
+                    ' myPdfSignatureAppearance.Layer2Font = New Font(Font.FontFamily.TIMES_ROMAN, 3)
+                    myPdfSignatureAppearance.IsInvisible()
+                    Dim pks As IExternalSignature = New X509Certificate2Signature(myCertificate, DigestAlgorithms.SHA1)
+                    Dim external As IExternalSignatureContainer = New ExternalBlankSignatureContainer(PdfName.ADOBE_PPKLITE, PdfName.ADBE_PKCS7_DETACHED)
+
+                    MakeSignature.SignDetached(myPdfSignatureAppearance, pks, myCertificateChain, crlList, ocspClient, tsaClient, 0, CryptoStandard.CMS)
+                    comprimir(result, destinationPathOri)
+                End Using
+            End Using
+        End Using
+    End Sub
+
+    Public Sub comprimir(ByVal theFilename As String, ByVal destinationPath As String)
+        Dim pdfFile As String = theFilename
+        Dim size As Rectangle = New Rectangle(1.0F, 1.0F)
+        Dim document As New Document(PageSize.A4, 0, 0, 0, 0)
+        Dim reader As New PdfReader(pdfFile)
+        Dim reader2 As New PdfFileSpecification()
+        Dim stamper As New PdfStamper(reader, New FileStream(destinationPath, FileMode.Create, FileAccess.Write), PdfWriter.VERSION_1_5)
+
+        document.SetPageSize(size)
+        document.SetMargins(0, 0, 0, 0)
+        Document.Compress = True
+        stamper.FormFlattening = True
+        stamper.SetFullCompression()
+
+
+        stamper.Close()
+    End Sub
+
+End Class
+
+
