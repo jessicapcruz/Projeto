@@ -1,0 +1,149 @@
+
+
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.annotation.PostConstruct;
+import javax.ejb.EJB;
+import javax.faces.bean.ManagedBean;
+import javax.faces.bean.ViewScoped;
+import javax.faces.context.FacesContext;
+import javax.faces.event.ActionEvent;
+
+import org.primefaces.event.SelectEvent;
+import org.primefaces.model.SelectableDataModel;  
+import br.com.polibel.dao.ClienteDaoRemote;
+import br.com.polibel.entidade.Cliente;
+import br.com.polibel.entidade.Endereco;
+import br.com.polibel.dao.EnderecoDaoRemote;
+
+@ManagedBean(name="clienteController")
+@ViewScoped
+public class ClienteController {
+	private Long idEndereco;
+	private Cliente cliente;
+	private Endereco endereco;
+	private List<Endereco> enderecos;
+	private List<Cliente> clientes;
+
+	@EJB
+	private ClienteDaoRemote clienteDao;
+	
+	@EJB
+	private EnderecoDaoRemote enderecoDao;
+
+	@PostConstruct
+	public void init() {
+		this.novo(null);	
+	}
+	
+	public void novo(final ActionEvent event) {
+		this.idEndereco = 0L;
+		this.cliente = new Cliente();
+		this.endereco = new Endereco();
+		this.enderecos = new ArrayList<Endereco>();
+		this.clientes = new ArrayList<Cliente>();
+	}
+	
+	public void salvar(final ActionEvent event) {
+		//this.endereco = this.enderecoDao.salvar(this.endereco);
+		//this.cliente.setId_endereco(this.endereco.getId());
+		this.cliente.setCnpj(this.cliente.getCnpj().replace(".", "").replace("-", ""));
+		this.cliente.setEnderecos(this.enderecos);
+		this.cliente = this.clienteDao.salvar(this.cliente);
+		limpaFormulario();
+	}
+	public  void incluirEndereco(){
+		if(this.validarEndereco(this.endereco)) {
+			this.endereco.setId(++this.idEndereco);
+			this.enderecos.add(endereco);
+			this.endereco = new Endereco();
+		}
+	}
+	
+	public void removerEndereco(final Endereco endereco){
+		this.enderecos.remove(endereco);
+	}
+	
+	public boolean validarEndereco(final Endereco endereco) {
+		if (endereco.getCep().length() > 0 && endereco.getLogradouro().length()>0 && endereco.getEstado().length()>0) {
+			return true;
+		} else{
+			return false;
+		}
+	}
+	public void selecionarCliente(final Cliente cliente){
+		this.cliente = cliente;
+		this.setEnderecos(enderecoDao.listByCliente(cliente));
+		System.out.println(this.enderecos.size());
+		
+	}
+	
+	public Cliente getCliente() {
+		return cliente;
+	}
+
+	public void setCliente(Cliente cliente) {
+		this.cliente = cliente;
+	}
+
+	public ClienteDaoRemote getClienteDao() {
+		return clienteDao;
+	}
+
+	public void setClienteDao(ClienteDaoRemote clienteDao) {
+		this.clienteDao = clienteDao;
+	}
+
+	public void pesquisarTodos(final ActionEvent event) {
+		this.clientes = this.clienteDao.pesquisarTodos();
+	}
+	
+	public void pesquisar(final ActionEvent event) {
+		this.clientes = this.clienteDao.pesquisar(this.cliente);
+	}
+	
+	public void excluir(final ActionEvent event) {
+		this.clienteDao.excluir(this.cliente.getId());
+	}
+		
+	public EnderecoDaoRemote getEnderecoDao() {
+			return enderecoDao;
+	}
+
+	public void setEnderecoDao(EnderecoDaoRemote enderecoDao) {
+			this.enderecoDao = enderecoDao;
+	}
+
+	private void limpaFormulario() {
+		this.cliente = new Cliente();
+		this.enderecos = new ArrayList<Endereco>();
+	}
+	public Endereco getEndereco() {
+		return endereco;
+	}
+	public void setEndereco(Endereco endereco) {
+		this.endereco = endereco;
+	}
+	public List<Endereco> getEnderecos() {
+		return enderecos;
+	}
+	public void setEnderecos(List<Endereco> enderecos) {
+		this.enderecos = enderecos;
+	}
+
+	public List<Cliente> getClientes() {
+		return clientes;
+	}
+
+	public void setClientes(List<Cliente> clientes) {
+		this.clientes = clientes;
+	}
+	
+    public String onRowSelectNavigate(SelectEvent event) {  
+        FacesContext.getCurrentInstance().getExternalContext().getFlash().put("setEndereco", event.getObject());  
+  
+        return "carDetail?faces-redirect=true";  
+    }  
+}
+
