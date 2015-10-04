@@ -1,0 +1,148 @@
+
+import java.io.Serializable;
+import java.util.Date;
+import java.util.List;
+
+import javax.persistence.CascadeType;
+import javax.persistence.Column;
+import javax.persistence.FetchType;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+import javax.persistence.Entity;
+import javax.persistence.ManyToOne;
+import javax.persistence.NamedQueries;
+import javax.persistence.NamedQuery;
+import javax.persistence.OneToMany;
+import javax.persistence.Table;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
+
+@Entity
+@Table(name="cliente")
+@NamedQueries(
+	@NamedQuery(name="Cliente.pesquisarTodos", query="select c from Cliente c")
+)
+public class Cliente implements Serializable{
+	private static final long serialVersionUID = 1L;
+
+	@Id
+	@Column(name="id")
+	@GeneratedValue(strategy=GenerationType.IDENTITY)
+    private Long id; 
+	private String cnpj;
+    private String inscricaoestadual;  
+    private String master;   
+    private String grau;    
+    private String categoria;   
+    private String site;	
+    private String nome;	
+	private String nomeFantasia;	
+	private String email;	
+	private String telefone;
+	
+	@OneToMany(cascade=CascadeType.DETACH, fetch=FetchType.LAZY, mappedBy="cliente")
+	private List<Pedido> pedidos;
+	
+	public List<Pedido> getPedidos() {
+		return pedidos;
+	}
+	public void setPedidos(List<Pedido> pedidos) {
+		this.pedidos = pedidos;
+	}
+	
+	@Temporal(TemporalType.DATE)
+	private Date cadastro;
+	
+	@OneToMany(cascade=CascadeType.DETACH, fetch=FetchType.LAZY, mappedBy="cliente")     
+	private List<Endereco> enderecos;
+
+	public Cliente(){
+	}
+	public List<Endereco> getEnderecos() {
+		return enderecos;
+	}
+	
+	public void setEnderecos(List<Endereco> enderecos) {
+		this.enderecos = enderecos;
+	}
+
+	public String getNome() {
+		return nome;
+	}
+	public void setNome(String nome) {
+		this.nome = nome;
+	}
+	public String getNomeFantasia() {
+		return nomeFantasia;
+	}
+	public void setNomeFantasia(String nomeFantasia) {
+		this.nomeFantasia = nomeFantasia;
+	}
+	public String getEmail() {
+		return email;
+	}
+	public void setEmail(String email) {
+		this.email = email;
+	}
+	public String getTelefone() {
+		return telefone;
+	}
+	public void setTelefone(String telefone) {
+		this.telefone = telefone;
+	}
+	public Date getCadastro() {
+		return cadastro;
+	}
+	public void setCadastro(Date cadastro) {
+		this.cadastro = cadastro;
+	}
+	public static long getSerialversionuid() {
+		return serialVersionUID;
+	}
+
+
+	public Long getId() {
+		return id;
+	}
+	public void setId(Long id) {
+		this.id = id;
+	}
+	public String getCnpj() {
+		return cnpj;
+	}
+	public void setCnpj(String cnpj) {
+		this.cnpj = cnpj;
+	}
+	public String getInscricaoestadual() {
+		return inscricaoestadual;
+	}
+	public void setInscricaoestadual(String inscricaoestadual) {
+		this.inscricaoestadual = inscricaoestadual;
+	}
+	public String getMaster() {
+		return master;
+	}
+	public void setMaster(String master) {
+		this.master = master;
+	}
+	public String getGrau() {
+		return grau;
+	}
+	public void setGrau(String grau) {
+		this.grau = grau;
+	}
+	public String getCategoria() {
+		return categoria;
+	}
+	public void setCategoria(String categoria) {
+		this.categoria = categoria;
+	}
+	public String getSite() {
+		return site;
+	}
+	public void setSite(String site) {
+		this.site = site;
+	}
+}
+
